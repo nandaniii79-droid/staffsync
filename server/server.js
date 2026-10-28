@@ -8,6 +8,10 @@ import authRoutes from './routes/auth.js';
 import employeeRoutes from './routes/employees.js';
 import leaveRoutes from './routes/leaves.js';
 import statsRoutes from './routes/stats.js';
+import announcementRoutes from './routes/announcements.js';
+import attendanceRoutes from './routes/attendance.js';
+import trainingRoutes from './routes/training.js';
+import meRoutes from './routes/me.js';
 
 dotenv.config();
 const app = express();
@@ -20,6 +24,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/training', trainingRoutes);
+app.use('/api/me', meRoutes);
 
 const PORT = process.env.PORT || 5000;
 mongoose

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api, { errMsg } from '../api';
 import Modal from '../components/Modal.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { hue } from './Dashboard.jsx';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -8,6 +9,10 @@ const days = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5) + 1;
 const fmt = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
 export default function Leaves() {
+  const { user } = useAuth();
+  const isHr = user.role === 'hr';
+  const canDecide = user.role === 'hr' || user.role === 'manager';
+
   const [leaves, setLeaves] = useState([]);
   const [emps, setEmps] = useState([]);
   const [tab, setTab] = useState('All');
@@ -16,7 +21,10 @@ export default function Leaves() {
   const [err, setErr] = useState('');
 
   const load = () => api.get('/leaves').then((r) => setLeaves(r.data));
-  useEffect(() => { load(); api.get('/employees').then((r) => setEmps(r.data)); }, []);
+  useEffect(() => {
+    load();
+    if (isHr) api.get('/employees').then((r) => setEmps(r.data));
+  }, []);
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -26,17 +34,25 @@ export default function Leaves() {
     catch (x) { setErr(errMsg(x)); }
   };
 
-  const decide = async (id, status) => { await api.patch(`/leaves/${id}/status`, { status }); load(); };
+  const decide = async (id, status) => {
+    try { await api.patch(`/leaves/${id}/status`, { status }); load(); }
+    catch (x) { alert(errMsg(x)); }
+  };
   const remove = async (id) => { if (confirm('Delete this request?')) { await api.delete(`/leaves/${id}`); load(); } };
 
   const shown = leaves.filter((l) => tab === 'All' || l.status === tab);
   const cls = { Pending: 'wait', Approved: 'ok', Rejected: 'bad' };
+  const title = canDecide ? <>Leave <i>requests</i></> : <>My <i>leaves</i></>;
 
   return (
     <>
       <header className="page">
-        <div><p className="eyebrow">Time off</p><h1>Leave <i>requests</i></h1></div>
-        <button className="btn" onClick={() => { setErr(''); setForm({ ...form, employee: emps[0]?._id || '' }); setModal(true); }} disabled={!emps.length}>
+        <div><p className="eyebrow">Time off</p><h1>{title}</h1></div>
+        <button
+          className="btn"
+          onClick={() => { setErr(''); setForm({ ...form, employee: emps[0]?._id || '' }); setModal(true); }}
+          disabled={isHr && !emps.length}
+        >
           + New request
         </button>
       </header>
@@ -50,7 +66,7 @@ export default function Leaves() {
       </div>
 
       {shown.length === 0 ? (
-        <div className="empty card"><h3>Nothing to show</h3><p className="muted">{emps.length ? 'No requests in this view.' : 'Add an employee first.'}</p></div>
+        <div className="empty card"><h3>Nothing to show</h3><p className="muted">No requests in this view.</p></div>
       ) : (
         <div className="stack">
           {shown.map((l) => (
@@ -66,16 +82,18 @@ export default function Leaves() {
                 <small>{days(l.from, l.to)} day{days(l.from, l.to) > 1 ? 's' : ''}</small>
               </div>
               <span className={`pill ${cls[l.status]}`}>{l.status}</span>
-              <div className="actions">
-                {l.status === 'Pending' ? (
-                  <>
-                    <button className="mini okb" onClick={() => decide(l._id, 'Approved')}>Approve</button>
-                    <button className="mini danger" onClick={() => decide(l._id, 'Rejected')}>Reject</button>
-                  </>
-                ) : (
-                  <button className="mini danger" onClick={() => remove(l._id)}>Delete</button>
-                )}
-              </div>
+              {canDecide && (
+                <div className="actions">
+                  {l.status === 'Pending' ? (
+                    <>
+                      <button className="mini okb" onClick={() => decide(l._id, 'Approved')}>Approve</button>
+                      <button className="mini danger" onClick={() => decide(l._id, 'Rejected')}>Reject</button>
+                    </>
+                  ) : (
+                    <button className="mini danger" onClick={() => remove(l._id)}>Delete</button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -84,11 +102,13 @@ export default function Leaves() {
       {modal && (
         <Modal title="New leave request" onClose={() => setModal(false)}>
           <form onSubmit={submit} className="form2">
-            <label className="full">Employee
-              <select required value={form.employee} onChange={set('employee')}>
-                {emps.map((e) => <option key={e._id} value={e._id}>{e.name} ({e.department})</option>)}
-              </select>
-            </label>
+            {isHr && (
+              <label className="full">Employee
+                <select required value={form.employee} onChange={set('employee')}>
+                  {emps.map((e) => <option key={e._id} value={e._id}>{e.name} ({e.department})</option>)}
+                </select>
+              </label>
+            )}
             <label>Type
               <select value={form.type} onChange={set('type')}><option>Casual</option><option>Sick</option><option>Paid</option><option>Unpaid</option></select>
             </label>

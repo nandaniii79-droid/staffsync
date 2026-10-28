@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import auth from '../middleware/auth.js';
+import auth, { allow } from '../middleware/auth.js';
 import Employee from '../models/Employee.js';
 import Leave from '../models/Leave.js';
 
 const router = Router();
-router.use(auth);
+router.use(auth, allow('hr', 'manager'));
 
 router.get('/', async (_, res) => {
   try {
